@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Working QR Scanner (Camera)</title>
+
+<!-- html5-qrcode -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<style>
+  body{ font-family: Arial, Helvetica, sans-serif; background:#f7f8fb; color:#111; margin:0; padding:20px; text-align:center; }
+  h1{ margin:0 0 12px 0; font-size:20px; }
+  #reader { width: 320px; margin: 12px auto; border-radius:8px; overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,0.08); }
+  #status { margin-top:12px; font-weight:600; color:#0a6; min-height:22px; }
+  #note { color:#666; font-size:13px; margin-top:6px; }
+  .controls { margin-top:14px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+  button { padding:10px 16px; border-radius:8px; border:0; background:#0b5cff; color:white; cursor:pointer; font-weight:600; }
+  button.secondary{ background:#444; }
+  pre{ text-align:left; max-width:760px; margin:20px auto; padding:10px; background:#fff; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.04); overflow:auto; }
+</style>
+</head>
+
+<body>
+  <h1>QR Scanner</h1>
+
+  <div id="reader"></div>
+
+  <div id="status">Waiting to scan…</div>
+  <div id="note">Tip: open this page on mobile/desktop over <strong>HTTPS</strong> or localhost.</div>
+
+  <div class="controls">
+    <button id="startBtn">Start Scanner</button>
+    <button id="stopBtn" class="secondary" disabled>Stop Scanner</button>
+  </div>
+
+  <pre id="log">Scanned output will appear here.</pre>
+
+<script>
+let html5Scanner = null;
+const readerId = "reader";
+const statusEl = document.getElementById("status");
+const logEl = document.getElementById("log");
+const startBtn = document.getElementById("startBtn");
+const stopBtn  = document.getElementById("stopBtn");
+
+// Prevent repeated rapid scans
+let scanLock = false;
+
+function appendLog(text){
+  const ts = new Date().toLocaleTimeString();
+  logEl.textContent = `[${ts}] ${text}\n` + logEl.textContent;
+}
+
+// Success callback — triggered when QR code is detected
+function onScanSuccess(decodedText, decodedResult){
+  if (scanLock) return;
+  scanLock = true;
+
+  statusEl.textContent = "Scanned: " + decodedText;
+  appendLog("Scanned → " + decodedText);
+
+  // Stop scanner after one successful scan
+  stopScanner();
+
+  // Allow scanning later (if user restarts)
+  setTimeout(() => { scanLock = false; }, 1000);
+}
+
+function onScanFailure(error){
+  // Optional debug
+  // console.warn("Scan failure:", error);
+}
+
+function startScanner(){
+  if (html5Scanner) {
+    statusEl.textContent = "Scanner already running";
+    return;
+  }
+
+  html5Scanner = new Html5QrcodeScanner(
+    readerId,
+    { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true },
+    false
+  );
+
+  try {
+    html5Scanner.render(onScanSuccess, onScanFailure);
+    statusEl.textContent = "Scanner started — point camera at QR";
+    startBtn.disabled = true;
+    stopBtn.disabled = false;
+    appendLog("Scanner started");
+  } catch (err) {
+    statusEl.textContent = "Unable to start scanner: " + err;
+    appendLog("Start error: " + err);
+    html5Scanner = null;
+  }
+}
+
+function stopScanner(){
+  if (!html5Scanner) {
+    statusEl.textContent = "Scanner is not running";
+    return;
+  }
+
+  html5Scanner.clear().then(() => {
+    html5Scanner = null;
+    statusEl.textContent = "Scanner stopped";
+    startBtn.disabled = false;
+    stopBtn.disabled = true;
+    appendLog("Scanner stopped");
+    document.getElementById(readerId).innerHTML = "";
+  }).catch(err => {
+    statusEl.textContent = "Error stopping scanner: " + err;
+    appendLog("Stop error: " + err);
+  });
+}
+
+// Button events
+startBtn.addEventListener("click", () => {
+  if (location.protocol !== "https:" && location.hostname !== "localhost") {
+    if (!confirm("Camera requires HTTPS or localhost. Continue anyway?")) {
+      return;
+    }
+  }
+  startScanner();
+});
+
+stopBtn.addEventListener("click", stopScanner);
+</script>
+</body>
+</html>
