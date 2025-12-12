@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Student QR Scanner</title>
+
+<!-- html5-qrcode -->
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-app.js";
+import { getDatabase, ref, set } from "https://www.gstatic.com/firebasejs/12.6.0/firebase-database.js";
+
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyDeLqOuca8tge4tOpgD7LKPIFubLew6ljQ",
+  authDomain: "attendance-management-sy-da7cd.firebaseapp.com",
+  databaseURL: "https://attendance-management-sy-da7cd-default-rtdb.firebaseio.com",
+  projectId: "attendance-management-sy-da7cd",
+  storageBucket: "attendance-management-sy-da7cd.firebasestorage.app",
+  messagingSenderId: "222467905728",
+  appId: "1:222467905728:web:e3a6b729c7d8b813497525",
+  measurementId: "G-H6R4YFBNMB"
+};
+
+// Init Firebase
+const app = initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
+// UI Refs
+let scanner = null;
+let scanned = false;
+
+function append(msg) {
+    document.getElementById("log").textContent = msg;
+}
+
+// Start Scanner
+window.startScanner = function () {
+    if (scanner) return;
+
+    scanner = new Html5Qrcode("reader");
+    scanner.start(
+        { facingMode: "environment" },
+        { fps: 2, qrbox: { width: 250, height: 250 } },
+        onScanSuccess
+    )
+    .then(() => append("Scanner started…"))
+    .catch(err => append("Error: " + err));
+};
+
+// Stop Scanner
+window.stopScanner = function () {
+    if (!scanner) return;
+    scanner.stop().then(() => {
+        scanner.clear();
+        scanner = null;
+        append("Scanner stopped.");
+    });
+};
+
+// QR Scan Success Handler
+function onScanSuccess(decodedText) {
+    if (scanned) return;
+    scanned = true;
+
+    append("QR Detected: " + decodedText);
+
+    const roll = localStorage.getItem("roll_number");
+
+    if (!roll) {
+        alert("No roll number found. Student not logged in.");
+        return;
+    }
+
+    // Write attendance
+    set(ref(db, "attendance/" + roll), "Present")
+        .then(() => {
+            alert("Attendance Marked Successfully!");
+            append("Attendance submitted.");
+            stopScanner();
+        })
+        .catch(err => {
+            alert("Error: " + err);
+        });
+}
+
+</script>
+
+<style>
+body { font-family: Arial; text-align: center; background: #f4f4f4; padding: 20px; }
+#reader { width: 300px; margin: auto; }
+button {
+    padding: 12px 18px;
+    margin-top: 15px;
+    font-size: 16px;
+    background: #0066ff;
+    border: none;
+    color: white;
+    border-radius: 5px;
+    cursor: pointer;
+}
+#log { margin-top: 20px; font-weight: bold; }
+</style>
+</head>
+
+<body>
+
+<h2>Student QR Scanner</h2>
+<p><b>Your Roll Number:</b> <span id="rollShow"></span></p>
+
+<div id="reader"></div>
+
+<button onclick="startScanner()">Start Scanning</button>
+<button onclick="stopScanner()">Stop</button>
+
+<p id="log">Waiting…</p>
+
+<script>
+document.getElementById("rollShow").innerText =
+    localStorage.getItem("roll_number") || "Not Logged In";
+</script>
+
+</body>
+</html>
